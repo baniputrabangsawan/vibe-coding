@@ -52,19 +52,22 @@ export const usersRoute = new Elysia({ prefix: '/api/users' })
       }),
     }
   )
-  .delete('/logout', async ({ headers, set }) => {
-    try {
-      const authHeader = headers['authorization'] || headers['Authorization'];
-      if (
-        !authHeader ||
-        typeof authHeader !== 'string' ||
-        !authHeader.startsWith('Bearer ')
-      ) {
-        set.status = 401;
-        return { error: 'Unauthorized' };
-      }
+  .derive(({ headers, set }) => {
+    const authHeader = headers['authorization'] || headers['Authorization'];
+    if (
+      !authHeader ||
+      typeof authHeader !== 'string' ||
+      !authHeader.startsWith('Bearer ')
+    ) {
+      set.status = 401;
+      throw new Error('Unauthorized');
+    }
 
-      const token = authHeader.replace('Bearer ', '').trim();
+    const token = authHeader.replace('Bearer ', '').trim();
+    return { token };
+  })
+  .delete('/logout', async ({ token, set }) => {
+    try {
       const result = await logoutUserService(token);
       return result;
     } catch (error: any) {
@@ -76,19 +79,8 @@ export const usersRoute = new Elysia({ prefix: '/api/users' })
       return { error: error.message || 'Internal Server Error' };
     }
   })
-  .get('/current', async ({ headers, set }) => {
+  .get('/current', async ({ token, set }) => {
     try {
-      const authHeader = headers['authorization'] || headers['Authorization'];
-      if (
-        !authHeader ||
-        typeof authHeader !== 'string' ||
-        !authHeader.startsWith('Bearer ')
-      ) {
-        set.status = 401;
-        return { error: 'Unauthorized' };
-      }
-
-      const token = authHeader.replace('Bearer ', '').trim();
       const result = await getCurrentUserService(token);
       return result;
     } catch (error: any) {
