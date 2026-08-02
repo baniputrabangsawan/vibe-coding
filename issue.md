@@ -1,101 +1,113 @@
-# Implementasi Fitur Login Pengguna (User Login & Sessions)
+# Implementasi Fitur Get Current User (Profil Pengguna Login)
 
 ## Deskripsi Tugas
-Tugas ini bertujuan untuk mengimplementasikan fitur autentikasi (login) untuk pengguna. Fitur ini mencakup pembuatan tabel `sessions` untuk mencatat aktivitas login dan pembuatan API endpoint untuk proses autentikasi.
+Tugas ini bertujuan untuk mengimplementasikan API endpoint `GET /api/users/current` untuk mengambil informasi profil pengguna yang sedang login berdasarkan token autentikasi yang dikirimkan pada HTTP Header.
 
 ## 1. Skema Database
 
-Buat definisi tabel `sessions`. Gunakan ORM (seperti Drizzle ORM) dengan spesifikasi berikut:
+Tabel `users` dan `sessions` sudah tersedia dari fitur sebelumnya:
+- **Tabel `users`**: Menyimpan data pengguna (`id`, `name`, `email`, `password`, `created_at`).
+- **Tabel `sessions`**: Menyimpan token sesi yang aktif (`id`, `token`, `user_id`, `created_at`).
 
-- `id`: integer, auto increment, primary key
-- `token`: varchar(255), not null, unique (akan menyimpan UUID/Token session pengguna)
-- `user_id`: integer, not null (Foreign Key merujuk ke `id` di tabel `users`)
-- `created_at`: timestamp, default current_timestamp
+*(Catatan Arsitektur: Token yang dikirimkan pada header `Authorization` akan dicocokkan dengan kolom `token` pada tabel `sessions` untuk mendapatkan data pengguna terkait).*
 
-*(Catatan Arsitektur: Tidak perlu menyimpan `password` di dalam tabel `sessions` karena password yang di-hash sudah tersimpan dan divalidasi dari tabel `users`. Menyimpan ulang password di session menyalahi prinsip normalisasi dan praktik keamanan).*
+## 2. API Endpoint Get Current User
 
-## 2. API Endpoint Login
+Buat endpoint REST API untuk mengambil data profil pengguna.
 
-Buat endpoint REST API untuk proses login pengguna.
+- **Method:** `GET`
+- **Path:** `/api/users/current`
 
-- **Method:** `POST`
-- **Path:** `/api/users/login`
+### Request Headers
+Header wajib menyertakan token autentikasi dengan skema `Bearer`:
 
-### Request Body (JSON)
-
-```json
-{
-  "email" : "bani@localhost",
-  "password" : "rahasia"
-}
+```http
+Authorization: Bearer <token-session-uuid>
 ```
 
 ### Response Body - Sukses (200 OK)
-Jika email ditemukan dan verifikasi password (menggunakan bcrypt) berhasil:
+Jika token valid dan ditemukan di tabel `sessions`:
 
 ```json
 {
-  "data" : "token-uuid-atau-random-string-disini"
+  "data" : {
+    "id" : 1,
+    "name": "bani",
+    "email": "bani@localhost",
+    "created_at": "2026-08-02T12:00:00.000Z"
+  }
 }
 ```
 
-### Response Body - Gagal (400 Bad Request / 401 Unauthorized)
-Jika email tidak ditemukan atau password tidak cocok:
+**Catatan Keamanan Penting:**
+- **JANGAN PERNAH** mengembalikan kolom `password` dalam respons API demi keamanan.
+
+### Response Body - Gagal (401 Unauthorized)
+Jika header `Authorization` tidak ada, format token salah (tidak diawali `Bearer `), atau token tidak ditemukan di tabel `sessions`:
 
 ```json
 {
-  "error" : "Email atau password salah"
+  "error" : "Unauthorized"
 }
 ```
-*(Catatan Keamanan: Gunakan pesan error yang generik seperti di atas agar tidak memberi petunjuk kepada penyerang apakah email yang salah atau password yang salah).*
 
 ## 3. Struktur File dan Arsitektur
 
-Lanjutkan arsitektur yang sudah ada pada direktori `src/`:
+Lanjutkan arsitektur yang ada pada direktori `src/`:
 
 1. **`src/routes/users-route.ts`**
-   - Tambahkan endpoint `POST /login` di dalam prefix `/api/users`.
-   - Lakukan validasi request body (`email` dan `password`).
-   - Panggil fungsi login dari layer service.
-   - Kembalikan response HTTP yang sesuai.
+   - Tambahkan endpoint `GET /current` di dalam prefix `/api/users`.
+   - Ambil header `authorization` dari request.
+   - Panggil fungsi service `getCurrentUserService(token)`.
+   - Kembalikan response HTTP 200 (sukses) atau 401 (Unauthorized jika gagal).
 
 2. **`src/services/users-services.ts`**
-   - Tambahkan logika bisnis login.
-   - Ambil data pengguna dari tabel `users` berdasarkan `email`.
-   - Verifikasi kecocokan `password` (plaintext) dengan hash yang ada di database menggunakan fungsi verifikasi bawaan (misal `Bun.password.verify`).
-   - Jika cocok, buatkan `token` unik (misal menggunakan `crypto.randomUUID()`).
-   - Simpan `token` dan `user_id` ke dalam tabel `sessions`.
-   - Kembalikan `token` tersebut.
+   - Buat fungsi `getCurrentUserService(token)`.
+   - Lakukan JOIN atau query relasi antara tabel `sessions` dan `users` berdasarkan `sessions.token`.
+   - Jika token tidak ditemukan, lemparkan error `'Unauthorized'`.
+   - Kembalikan data profil user tanpa menyertakan kolom `password`.
 
 ## 4. Tahapan Implementasi (Panduan Pengerjaan)
 
 Ikuti langkah-langkah berikut secara berurutan:
 
-### Langkah 1: Persiapan Skema Database
-1. Buka `src/db/schema.ts`.
-2. Tambahkan definisi tabel `sessions` dengan relasi `user_id` ke tabel `users`.
-3. Pastikan kolom `token` diset UNIQUE agar tidak ada tabrakan session.
-4. Jalankan perintah migrasi (misal `drizzle-kit generate` dan `drizzle-kit push`) untuk memperbarui database.
-
-### Langkah 2: Logika Bisnis di Service (`users-services.ts`)
+### Langkah 1: Implementasi Service (`users-services.ts`)
 1. Buka file `src/services/users-services.ts`.
-2. Buat fungsi baru, misalnya `loginUserService(payload)`.
-3. Cari data user di database berdasarkan `payload.email`. Jika tidak ada, lemparkan error `'Email atau password salah'`.
-4. Lakukan pengecekan password menggunakan fungsi verifikasi bcrypt. Jika `false`, lemparkan error `'Email atau password salah'`.
-5. Hasilkan string token acak (misalnya menggunakan `crypto.randomUUID()`).
-6. Insert data baru ke tabel `sessions` berisi `token` dan `user_id` milik pengguna tersebut.
-7. Return nilai string `token`.
+2. Buat fungsi baru `getCurrentUserService(token: string)`.
+3. Lakukan query pencarian ke database:
+   - Cari data di tabel `sessions` yang cocok dengan `token`.
+   - Dapatkan data `users` yang berelasi dengan `sessions.user_id`.
+   - *Alternatif Drizzle query*:
+     ```ts
+     const [sessionWithUser] = await db
+       .select({
+         id: users.id,
+         name: users.name,
+         email: users.email,
+         createdAt: users.createdAt,
+       })
+       .from(sessions)
+       .innerJoin(users, eq(sessions.userId, users.id))
+       .where(eq(sessions.token, token))
+       .limit(1);
+     ```
+4. Jika hasil query kosong/tidak ditemukan, lemparkan error `'Unauthorized'`.
+5. Kembalikan objek `{ data: sessionWithUser }`.
 
-### Langkah 3: Routing Endpoint (`users-route.ts`)
+### Langkah 2: Implementasi Route (`users-route.ts`)
 1. Buka file `src/routes/users-route.ts`.
-2. Tambahkan handler `.post('/login', ...)` di bawah routing pendaftaran yang sudah ada.
-3. Gunakan TypeBox untuk validasi schema request body memastikan `email` dan `password` bertipe string.
-4. Panggil fungsi `loginUserService(body)`.
-5. Tangkap error di dalam blok `catch`. Jika pesan error adalah "Email atau password salah", kembalikan HTTP status 401 (Unauthorized) atau 400 (Bad Request) dengan respons JSON `{"error": "Email atau password salah"}`.
-6. Jika eksekusi berhasil, kembalikan respons `{"data": token}` dengan HTTP status 200.
+2. Tambahkan handler `.get('/current', ...)` di bawah rute login.
+3. Di dalam handler, ekstrak header `authorization` dari konteks request (`headers.authorization` atau `headers['authorization']`).
+4. **Parsing Token Bearer**:
+   - Cek apakah header `authorization` ada dan diawali dengan `"Bearer "`.
+   - Potong string untuk mengambil token saja: `const token = authHeader.replace('Bearer ', '').trim();`.
+   - Jika header tidak ada atau tidak valid, langsung kembalikan status 401 dengan `{ "error": "Unauthorized" }`.
+5. Panggil fungsi `getCurrentUserService(token)`.
+6. Tangkap error di dalam blok `catch`. Jika error adalah "Unauthorized", set HTTP status 401 dan kembalikan `{ "error": "Unauthorized" }`.
+7. Jika berhasil, kembalikan data respons dengan HTTP status 200.
 
-### Langkah 4: Pengujian (Testing)
-1. Jalankan aplikasi secara lokal.
-2. Gunakan HTTP Client (seperti Postman atau cURL) untuk menembak endpoint login.
-3. Uji skenario sukses dengan akun yang terdaftar pada implementasi sebelumnya. Pastikan respons mengembalikan token dan tabel `sessions` bertambah datanya.
-4. Uji skenario gagal (email salah atau password salah) untuk memastikan respons keamanan berjalan dengan benar.
+### Langkah 3: Pengujian (Testing)
+1. Jalankan aplikasi secara lokal (`bun run dev`).
+2. **Skenario Login**: Lakukan login via `POST /api/users/login` untuk mendapatkan string `token`.
+3. **Skenario Sukses**: Kirim request `GET http://localhost:3000/api/users/current` dengan header `Authorization: Bearer <token>`. Pastikan respons mengembalikan data profil pengguna tanpa password.
+4. **Skenario Gagal**: Kirim request tanpa header `Authorization` atau dengan token yang salah/asal. Pastikan respons mengembalikan status 401 `{ "error": "Unauthorized" }`.
