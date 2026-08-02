@@ -3,6 +3,7 @@ import {
   registerUserService,
   loginUserService,
   logoutUserService,
+  getCurrentUserService,
 } from '../services/users-services';
 
 export const usersRoute = new Elysia({ prefix: '/api/users' })
@@ -65,6 +66,30 @@ export const usersRoute = new Elysia({ prefix: '/api/users' })
 
       const token = authHeader.replace('Bearer ', '').trim();
       const result = await logoutUserService(token);
+      return result;
+    } catch (error: any) {
+      if (error.message === 'Unauthorized') {
+        set.status = 401;
+        return { error: 'Unauthorized' };
+      }
+      set.status = 500;
+      return { error: error.message || 'Internal Server Error' };
+    }
+  })
+  .get('/current', async ({ headers, set }) => {
+    try {
+      const authHeader = headers['authorization'] || headers['Authorization'];
+      if (
+        !authHeader ||
+        typeof authHeader !== 'string' ||
+        !authHeader.startsWith('Bearer ')
+      ) {
+        set.status = 401;
+        return { error: 'Unauthorized' };
+      }
+
+      const token = authHeader.replace('Bearer ', '').trim();
+      const result = await getCurrentUserService(token);
       return result;
     } catch (error: any) {
       if (error.message === 'Unauthorized') {
