@@ -67,3 +67,23 @@ export async function loginUserService(payload: LoginUserPayload) {
 
   return { data: token };
 }
+
+export async function getCurrentUserService(token: string) {
+  const [sessionWithUser] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      createdAt: users.createdAt,
+    })
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .where(eq(sessions.token, token))
+    .limit(1);
+
+  if (!sessionWithUser) {
+    throw new Error('Unauthorized');
+  }
+
+  return { data: sessionWithUser };
+}
