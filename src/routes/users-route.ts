@@ -24,11 +24,21 @@ export const usersRoute = new Elysia({ prefix: '/api/users' })
     },
     {
       body: t.Object({
-        name: t.String(),
-        email: t.String(),
-        password: t.String(),
+        name: t.String({
+          maxLength: 255,
+          error: 'Nama maksimal 255 karakter',
+        }),
+        email: t.String({
+          format: 'email',
+          error: 'Format email tidak valid',
+        }),
+        password: t.String({
+          minLength: 6,
+          error: 'Password minimal 6 karakter',
+        }),
       }),
     }
+
   )
   .post(
     '/login',
