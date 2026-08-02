@@ -2,6 +2,7 @@ import { Elysia, t } from 'elysia';
 import {
   registerUserService,
   loginUserService,
+  logoutUserService,
   getCurrentUserService,
 } from '../services/users-services';
 
@@ -51,19 +52,35 @@ export const usersRoute = new Elysia({ prefix: '/api/users' })
       }),
     }
   )
-  .get('/current', async ({ headers, set }) => {
+  .derive(({ headers, set }) => {
+    const authHeader = headers['authorization'] || headers['Authorization'];
+    if (
+      !authHeader ||
+      typeof authHeader !== 'string' ||
+      !authHeader.startsWith('Bearer ')
+    ) {
+      set.status = 401;
+      throw new Error('Unauthorized');
+    }
+
+    const token = authHeader.replace('Bearer ', '').trim();
+    return { token };
+  })
+  .delete('/logout', async ({ token, set }) => {
     try {
-      const authHeader = headers['authorization'] || headers['Authorization'];
-      if (
-        !authHeader ||
-        typeof authHeader !== 'string' ||
-        !authHeader.startsWith('Bearer ')
-      ) {
+      const result = await logoutUserService(token);
+      return result;
+    } catch (error: any) {
+      if (error.message === 'Unauthorized') {
         set.status = 401;
         return { error: 'Unauthorized' };
       }
-
-      const token = authHeader.replace('Bearer ', '').trim();
+      set.status = 500;
+      return { error: error.message || 'Internal Server Error' };
+    }
+  })
+  .get('/current', async ({ token, set }) => {
+    try {
       const result = await getCurrentUserService(token);
       return result;
     } catch (error: any) {
