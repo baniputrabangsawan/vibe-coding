@@ -23,6 +23,11 @@ export const usersRoute = new Elysia({ prefix: '/api/users' })
       }
     },
     {
+      detail: {
+        tags: ['Users'],
+        summary: 'Registrasi Pengguna Baru',
+        description: 'Endpoint untuk mendaftarkan akun pengguna baru ke dalam sistem.',
+      },
       body: t.Object({
         name: t.String({
           maxLength: 255,
@@ -56,6 +61,11 @@ export const usersRoute = new Elysia({ prefix: '/api/users' })
       }
     },
     {
+      detail: {
+        tags: ['Users'],
+        summary: 'Login Pengguna',
+        description: 'Endpoint untuk autentikasi pengguna dan mereturn token sesi.',
+      },
       body: t.Object({
         email: t.String(),
         password: t.String(),
@@ -76,29 +86,49 @@ export const usersRoute = new Elysia({ prefix: '/api/users' })
     const token = authHeader.replace('Bearer ', '').trim();
     return { token };
   })
-  .delete('/logout', async ({ token, set }) => {
-    try {
-      const result = await logoutUserService(token);
-      return result;
-    } catch (error: any) {
-      if (error.message === 'Unauthorized') {
-        set.status = 401;
-        return { error: 'Unauthorized' };
+  .delete(
+    '/logout',
+    async ({ token, set }) => {
+      try {
+        const result = await logoutUserService(token);
+        return result;
+      } catch (error: any) {
+        if (error.message === 'Unauthorized') {
+          set.status = 401;
+          return { error: 'Unauthorized' };
+        }
+        set.status = 500;
+        return { error: error.message || 'Internal Server Error' };
       }
-      set.status = 500;
-      return { error: error.message || 'Internal Server Error' };
+    },
+    {
+      detail: {
+        tags: ['Users'],
+        summary: 'Logout Pengguna',
+        description: 'Endpoint untuk menghapus sesi aktif berdasarkan token Bearer.',
+      },
     }
-  })
-  .get('/current', async ({ token, set }) => {
-    try {
-      const result = await getCurrentUserService(token);
-      return result;
-    } catch (error: any) {
-      if (error.message === 'Unauthorized') {
-        set.status = 401;
-        return { error: 'Unauthorized' };
+  )
+  .get(
+    '/current',
+    async ({ token, set }) => {
+      try {
+        const result = await getCurrentUserService(token);
+        return result;
+      } catch (error: any) {
+        if (error.message === 'Unauthorized') {
+          set.status = 401;
+          return { error: 'Unauthorized' };
+        }
+        set.status = 500;
+        return { error: error.message || 'Internal Server Error' };
       }
-      set.status = 500;
-      return { error: error.message || 'Internal Server Error' };
+    },
+    {
+      detail: {
+        tags: ['Users'],
+        summary: 'Get Profile Pengguna',
+        description: 'Endpoint untuk mengambil profil pengguna yang sedang terautentikasi.',
+      },
     }
-  });
+  );

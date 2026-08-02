@@ -21,6 +21,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@elysiajs/swagger": "^1.3.1",
     "drizzle-orm": "^0.45.2",
     "elysia": "^1.4.29",
     "mysql2": "^3.23.2"
